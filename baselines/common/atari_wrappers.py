@@ -10,7 +10,7 @@ from .wrappers import TimeLimit
 
 
 class NoopResetEnv(gym.Wrapper):
-    def __init__(self, env, noop_max=30):
+    def __init__(self, env, noop_max=85):
         """Sample initial states by taking random number of no-ops on reset.
         No-op is assumed to be action 0.
         """
@@ -29,7 +29,7 @@ class NoopResetEnv(gym.Wrapper):
             noops = self.unwrapped.np_random.randint(1, self.noop_max + 1) #pylint: disable=E1101
         assert noops > 0
         obs = None
-        for _ in range(noops):
+        for _ in range(self.noop_max):
             obs, _, done, _ = self.env.step(self.noop_action)
             if done:
                 obs = self.env.reset(**kwargs)
@@ -131,7 +131,7 @@ class ClipRewardEnv(gym.RewardWrapper):
         return np.sign(reward)
 
 class WarpFrame(gym.ObservationWrapper):
-    def __init__(self, env, width=84, height=84, grayscale=True):
+    def __init__(self, env, width=114, height=114, grayscale=False):
         """Warp frames to 84x84 as done in the Nature paper and later work."""
         gym.ObservationWrapper.__init__(self, env)
         self.width = width
@@ -147,7 +147,7 @@ class WarpFrame(gym.ObservationWrapper):
     def observation(self, frame):
         if self.grayscale:
             frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-        frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_AREA)
+        frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_LINEAR)
         if self.grayscale:
             frame = np.expand_dims(frame, -1)
         return frame
@@ -232,14 +232,17 @@ def make_atari(env_id, max_episode_steps=None):
         env = TimeLimit(env, max_episode_steps=max_episode_steps)
     return env
 
-def wrap_deepmind(env, episode_life=True, clip_rewards=True, frame_stack=False, scale=False):
+def wrap_deepmind(env, episode_life=False, clip_rewards=True, frame_stack=False, scale=False):
     """Configure environment for DeepMind-style Atari.
     """
     if episode_life:
         env = EpisodicLifeEnv(env)
     if 'FIRE' in env.unwrapped.get_action_meanings():
         env = FireResetEnv(env)
+
+
     env = WarpFrame(env)
+
     if scale:
         env = ScaledFloatFrame(env)
     if clip_rewards:
